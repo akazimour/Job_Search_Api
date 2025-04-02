@@ -1,0 +1,23 @@
+
+services:
+  service-reg:
+    build:
+      context: ../service-reg
+      dockerfile: Dockerfile-service-reg
+    container_name: service-reg
+    ports:
+      - "8761:8761"
+    networks:
+      - microservice-network
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+
+networks:
+  microservice-network:
+    driver: bridge
+
+
+
+
+
+
