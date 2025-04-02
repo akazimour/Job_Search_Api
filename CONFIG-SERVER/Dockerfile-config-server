@@ -1,0 +1,9 @@
+# Alap image (OpenJDK 21)
+FROM openjdk:21-jdk-slim
+
+WORKDIR /app
+
+COPY target/CONFIG-SERVER-3.4.3.jar config-server.jar
+
+# Indítsd el a JAR fájlt
+CMD ["java", "-jar", "config-server.jar"]
