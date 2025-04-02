@@ -1,0 +1,196 @@
+name: microservices
+services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:latest
+    container_name: zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+    networks:
+      - microservice-network
+    restart: unless-stopped
+
+  kafka:
+      image: confluentinc/cp-kafka:latest
+      container_name: kafka
+      depends_on:
+        - zookeeper
+      environment:
+        KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+        KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+        KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
+        KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+        KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      ports:
+        - "9092:9092"
+      networks:
+        - microservice-network
+      restart: unless-stopped
+
+  postgres:
+    container_name: postgres_container
+    image: postgres
+    environment:
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      PG_DATA: /data/postgres
+    volumes:
+      - postgres:/data/postgres
+    ports:
+      - "5432:5432"
+    networks:
+      - postgres
+    restart: unless-stopped
+  zipkin:
+    image: openzipkin/zipkin
+    container_name: zipkin
+    ports:
+      - 9411:9411
+    environment:
+      - ZIPKIN_URL=zipkin
+    networks:
+      - microservice-network
+
+  pgadmin:
+    container_name: pgadmin_container
+    image: dpage/pgadmin4
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-pgadmin4@pgadmin.org}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:-admin}
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    volumes:
+      - pgadmin:/var/lib/pgadmin
+    ports:
+      - 5050:80
+    networks:
+      - postgres
+    restart: unless-stopped
+
+  service-reg:
+    build:
+      context: ../service-reg
+      dockerfile: Dockerfile-service-reg
+    container_name: service-reg
+    image: eurekaserver-image
+    ports:
+      - "8761:8761"
+    networks:
+      - microservice-network
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+
+  config-server:
+    build:
+      context: ../config-server
+      dockerfile: Dockerfile-config-server
+    container_name: config-server
+    ports:
+      - "8888:8888"
+    volumes:
+    - C:/Config:/config
+    networks:
+      - microservice-network
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - EUREKA_SERVER_ADDRESS=http://host.docker.internal:8761/eureka/
+      - SPRING_CLOUD_CONFIG_SERVER_GIT_URI=file:///config
+    depends_on:
+      - service-reg
+
+
+  gateway:
+    build:
+      context: ../gateway
+      dockerfile: Dockerfile-gateway
+    container_name: gateway
+    ports:
+      - "8089:8089"
+    networks:
+      - microservice-network
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - EUREKA_SERVER_ADDRESS=http://host.docker.internal:8761/eureka/
+      - CONFIG_SERVER_URL=config-server
+    depends_on:
+      - config-server
+      - service-reg
+
+  job-ms:
+    build:
+      context: ../job-ms
+      dockerfile: Dockerfile-job-ms
+    container_name: job
+    ports:
+      - "8081:8081"
+    networks:
+      - postgres
+      - microservice-network
+    environment:
+        - SPRING_PROFILES_ACTIVE=docker
+        - EUREKA_SERVER_ADDRESS=http://host.docker.internal:8761/eureka/
+        - CONFIG_SERVER_URL=config-server
+    depends_on:
+      - service-reg
+      - config-server
+      - postgres
+
+  review-ms:
+    build:
+      context: ../review-ms
+      dockerfile: Dockerfile-review-ms
+    container_name: review
+    ports:
+      - "8083:8083"
+    networks:
+      - postgres
+      - microservice-network
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - EUREKA_SERVER_ADDRESS=http://host.docker.internal:8761/eureka/
+      - CONFIG_SERVER_URL=config-server
+      - POSTGRES_URL=postgres_container
+    depends_on:
+      - service-reg
+      - config-server
+      - postgres
+
+  company-ms:
+    build:
+      context: ../company-ms
+      dockerfile: Dockerfile-company-ms
+    container_name: company
+    ports:
+      - "8082:8082"
+    networks:
+      - postgres
+      - microservice-network
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - EUREKA_SERVER_ADDRESS=http://host.docker.internal:8761/eureka/
+      - CONFIG_SERVER_URL=config-server
+      - POSTGRES_URL=postgres_container
+    depends_on:
+      - service-reg
+      - config-server
+      - postgres
+
+networks:
+  microservice-network:
+    driver: bridge
+  postgres:
+    driver: bridge
+
+volumes:
+  postgres:
+  pgadmin:
+
+
+
+
+
+
+
+
+
