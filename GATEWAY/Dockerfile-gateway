@@ -1,0 +1,11 @@
+# Alap image (OpenJDK 21)
+FROM openjdk:21-jdk-slim
+
+# Munkakönyvtár beállítása
+WORKDIR /app
+
+# Másold a JAR fájlt a konténerbe
+COPY target/GATEWAY-3.4.3.jar gateway.jar
+
+# Indítsd el a JAR fájlt
+CMD ["java", "-jar", "gateway.jar"]
